@@ -1,4 +1,11 @@
+---
+title: "Region-Atlas"
+author: "Samhällsanalys"
+date: "`r Sys.Date()`"
+output: html_document
+---
 
+```{r setup, include=FALSE}
 
 # libraries
 if (!require("pacman")) install.packages("pacman")
@@ -17,6 +24,10 @@ set_config(config(ssl_verifypeer = 0L))
 options(scipen=999)
 
 wd = getwd()
+
+data_input = paste0(wd,"/data_input")
+data_output = paste0(wd,"/data_output")
+output = paste0(wd,"/output")
 
 # ========================================== inställningar ===============================================
 
@@ -73,7 +84,7 @@ gtfs_reg_df <- gtfs_reg_list$stop_times %>%
   distinct(arrival_time, departure_time, stop_id, .keep_all= TRUE) # remove duplicates
 
 # Tidtabelldata är på hållplatslägesnivå. Ta medel för att skapa en koordinat per hållplats
-gtfs_reg_df <- gtfs_reg_df %>% 
+gtfs_reg_df_2 <- gtfs_reg_df %>% 
   group_by(hpl_id, stop_name) %>% 
   mutate(hpl_lat = round(mean(as.numeric(stop_lat)),5), hpl_lon = round(mean(as.numeric(stop_lon)), 5)) %>% 
   ungroup() %>% 
@@ -81,11 +92,11 @@ gtfs_reg_df <- gtfs_reg_df %>%
          hpl_lat, hpl_lon, route_id, trip_id, stop_id, hpl_id)
 
 # beräkna antal avgångar per hållplats
-antal_avgangar = gtfs_reg_df %>% 
+antal_avgangar = gtfs_reg_df_2 %>% 
   group_by(hpl_id) %>% 
   summarise(antal_avg = n())
 
-mapview(antal_avgangar)
+#mapview(antal_avgangar)
 # ====================== hämta de linjer som ska ritas ut i det förenklade linjenätet ============================
 
 linjetyp <- read_xlsx(linjeklass_fil)              # ladda in linjeklassificeringsfilen som vi fått från kollektivtrafikförvaltningen
@@ -116,11 +127,11 @@ tatorter <- tatorter %>%
 # glimpse(tatorter)
 tatorter <- filter(tatorter, lan_kod == 20)
 
-  #mapview(alla_hpl, label = "namn") #hur gjorde jag alla hållplatser till KTF?
+#mapview(alla_hpl, label = "namn") #hur gjorde jag alla hållplatser till KTF?
 
 # ta ut den hållplats i varje tätort som har flest avgångar, den använder vi för alla anslutningar till den tätorten
 # först aggregerar vi antal avgångar per hållplats, gör sf-objekt av det och kopplar på tätorter
-avgangar_hpl <- gtfs_reg_df %>% 
+avgangar_hpl <- gtfs_reg_df_2 %>% 
   group_by(stop_name, hpl_id, hpl_lat, hpl_lon) %>% 
   summarise(antal_avg = n()) %>% 
   ungroup()
@@ -163,7 +174,7 @@ alla_hpl <- NULL                                   # skapa tomt objekt som vi l�
 for (linjenr in straklinjer) {
   #print(paste0("Hanterar linjenummer ", linjenr))          # kan användas för felsökning, man ser vilken linje som felet uppstår med om det uppstår ett fel. 
   if (linjenr %in% unique(gtfs_reg_df$route_short_name)) {
-    linje <- gtfs_reg_df %>% filter(route_short_name == linjenr) %>% 
+    linje <- gtfs_reg_df_2 %>% filter(route_short_name == linjenr) %>% 
       left_join(antal_avgangar, by = "hpl_id")
     
     turer <- linje %>%
@@ -188,7 +199,7 @@ for (linjenr in straklinjer) {
       st_transform(crs = 3006)         # konvertera till SWEREF99
     
     # ta ut alla busshållplatser som finns i tätorter
-    hpl_alla <- st_join(linje_sf, tatorter_med_buffert) 
+    hpl_alla <- st_join(linje_sf, tatorter) 
     
     #hpl_tatort <- suppressWarnings(st_intersection(linje_sf, tatorter))
     
@@ -225,38 +236,16 @@ for (linjenr in straklinjer) {
     } else print(paste0("Linjenummer ", linjenr, " har inte busshållplatser i flera tätorter. Går vidare till nästa linje i vektorn.")) # slut if-sats test om linjenr finns i datasetet
     
   } else print(paste0("Linjenummer ", linjenr, " finns inte. Går vidare till nästa linje i vektorn.")) # slut if-sats test om linjenr finns i datasetet
-}  
-#mapview(alla_linjer)
+} 
+
 # en test att gruppera ihop alla linjer som ligger ovanpå varandra, och lägga linjenamnen som textsträng i kolumnen linjenr
 alla_linjer_aggr <- alla_linjer %>% 
   group_by(geometry) %>% 
   summarize(linjenr = paste(sort(unique(label)),collapse=", ")) %>% 
   ungroup() 
 
-# här kan vi titta på alla hållplatser för att se att det blir korrekt
-mapview(tatorter, label = "tatort")+
-  mapview(alla_linjer_aggr, label = "linjenr")+
-  mapview(alla_hpl, label = "namn")
-
-# # med oaggregerade linjer
-# #mapview(tatorter, label = "tatort")+
-#   #mapview(alla_linjer, label = "label")+
-#   #mapview(alla_hpl, label = "namn")
-# 
-# 
-# # lägg alla lager i en lista som vi skickar till en walk2-funktion (OBS! Funkar inte med svenska tecken i lagernamnen)
-# export_fran_r <- list("Tatorter" = tatorter_med_buffert,
-#                       "Busslinjer_aggr" = alla_linjer_aggr,
-#                       "Hallplatser" = alla_hpl)
-# 
-# # om filen redan finns sparas den med samma namn men med en siffra i slutet så att den inte hitter samma
-# gis_filnamn <- sparafil_unik(paste0(data_input, "/", filnamn_export))
-# 
-# # här sparar vi alla lager som ett layer i en gpkg-fil
-# walk2(export_fran_r, names(export_fran_r), ~ st_write(.x, gis_filnamn, layer = .y))
-
 # Tidtabelldata är på hållplatslägesnivå. Ta medel för att skapa en koordinat per hållplats
-gtfs_reg_df2 <- gtfs_reg_df %>% 
+gtfs_reg_df3 <- gtfs_reg_df %>% 
   group_by(stop_id, hpl_id, stop_name, 
            stop_lat, stop_lon) %>%
   summarise(busslinjer = paste0(route_short_name%>% unique(), collapse = ", ") %>% unique())
@@ -270,7 +259,7 @@ service_id_inklud_reg <- gtfs_reg_list$calendar_dates %>% filter(date == datum_f
 trips_inklud_reg <- gtfs_reg_list$trips %>% filter(service_id %in% service_id_inklud_reg) %>% select(trip_id) %>% pull()
 
 # här kopplar vi ihop relevant information från alla dataseten i gtfs-zipfilen
-gtfs_reg_df <- gtfs_reg_list$stop_times %>%
+gtfs_reg_df_4 <- gtfs_reg_list$stop_times %>%
   left_join(., gtfs_reg_list$trips, by = "trip_id") %>%
   left_join(., gtfs_reg_list$stops, by = "stop_id") %>%
   left_join(., gtfs_reg_list$routes, by = "route_id") %>%
@@ -279,12 +268,10 @@ gtfs_reg_df <- gtfs_reg_list$stop_times %>%
   distinct(arrival_time, departure_time, stop_id, .keep_all= TRUE) # remove duplicates
 
 # Tidtabelldata är på hållplatslägesnivå. Ta medel för att skapa en koordinat per hållplats
-gtfs_reg_df2 <- gtfs_reg_df %>% 
+gtfs_reg_df_5 <- gtfs_reg_df %>% 
   group_by(stop_id, hpl_id, stop_name, 
            stop_lat, stop_lon) %>%
   summarise(busslinjer = paste0(route_short_name%>% unique(), collapse = ", ") %>% unique())
-
-mapview(gtfs_reg_df2)
 
 # beräkna antal avgångar per hållplats
 antal_avgangar = gtfs_reg_df %>%
@@ -300,7 +287,7 @@ antal_linjer = gtfs_reg_df %>%
 
 ## Tidtabelldata är på hållplatslägenivå. Ta medel för att skapa en koordinat per hållplats 
 #ändrar hpl_lat till stop_lat och hpl_lon till stop_lon
-hpl_koord = gtfs_reg_df2 %>%
+hpl_koord = gtfs_reg_df_5 %>%
   group_by(hpl_id, stop_name) %>%
   summarise(lat = round(mean(as.numeric(stop_lat)), 5), lon = round(mean(as.numeric(stop_lon)), 5)) %>%
   ungroup() %>%
@@ -317,20 +304,54 @@ centrumkoordinat_hallplatser = st_as_sf(spdf_hpl_cent) %>% # convert to sf objec
   st_set_crs(4326) %>% # set WGS84 as CRS
   st_transform(3006) 
 
-# create SF object av hållplatslägen
-xy_gtfs = gtfs_reg_df2[,c("stop_lon", "stop_lat")]
+#mapview(centrumkoordinat_hallplatser)
 
-spdf <- SpatialPointsDataFrame(coords = xy_gtfs, data = gtfs_reg_df2) # create spatial points
+# create SF object av hållplatslägen
+xy_gtfs = gtfs_reg_df_5[,c("stop_lon", "stop_lat")]
+
+spdf <- SpatialPointsDataFrame(coords = xy_gtfs, data = gtfs_reg_df_5) # create spatial points
 
 hallplatslagen = st_as_sf(spdf) %>% # convert to sf object
   st_set_crs(4326) %>% # set WGS84 as CRS
-  st_transform(3006) 
+  st_transform(3006)
 
-reds = colorRampPalette(c('red'))
-greens = colorRampPalette(c('green', 'darkgreen'))
+# Fetch DeSO and filter shapefile 
+#---------------------------------------------------------------------------------------------------
+deso_fil <- "G:/Samhällsanalys/GIS/grundkartor/deso/DeSO_2018_v2.gpkg"
 
-mapview(hallplatslagen, zcol = "busslinjer", legend = FALSE, color = "darkgreen", cex = 3, layer.name = c("Hållplatslägen"))+
+deso <- st_read(deso_fil, crs = 3006)
+
+deso = filter(deso, lan == lan_kod) # extract data for Uppsala län
+
+mapview(deso)
+
+#---------------------------------------------------------------------------------------------------
+# Create kommun boundaries based on DeSo boundaries 
+#---------------------------------------------------------------------------------------------------
+kommun = deso %>% 
+  filter(substr(kommun, 1, 2) == lan_kod) %>% 
+  group_by(kommun, kommunnamn) %>% 
+  summarize(geom = st_union(geom)) %>% 
+  ungroup()
+
+jarnvag_fil <- "G:/skript/henrik/GitHub/Region-Atlas/QGIS/ralstrafik.gpkg"
+
+jarnvag <- st_read(jarnvag_fil, crs = 3006)
+
+jarnvagstation_fil <- "G:/skript/henrik/GitHub/Region-Atlas/QGIS/ralstrafikstation.gpkg"
+
+jarnvagstation <- st_read(jarnvagstation_fil, crs = 3006)
+```
+
+```{r, echo = FALSE, message=FALSE, warning=FALSE}
+mapview(hallplatslagen, zcol = "busslinjer", legend = FALSE, col.regions = "darkgreen", cex = 3, layer.name = c("Hållplatslägen"))+
   mapview(centrumkoordinat_hallplatser, col.regions = "green", zcol = "stop_name", legend =FALSE, cex = "antal_avg", layer.name = c("Centrumkoordinat"))+
-  mapview(tatorter, col.regions = "orange", alpha.regions = -1, label = "tatort")+
-  mapview(alla_linjer_aggr, color = "lightyellow", lwd = 10, legend = FALSE)+
-  mapview(alla_hpl, col.regions = "yellow", label = "namn")
+  mapview(tatorter, col.regions = "white",legend = FALSE, alpha.regions = 0.1, label = "tatort", layer.name = c("Tätorter"))+
+  mapview(alla_linjer_aggr, color = "gold", lwd = 10, alpha = 0.5, legend = FALSE, layer.name = c("Busslinjekarta-linjer"))+
+  mapview(alla_hpl, col.regions = "yellow", legend = FALSE, label = "namn", layer.name = c("Busslinjekarta-station"))+
+  mapview(kommun, burst = "kommunnamn", alpha = TRUE, legend = FALSE, alpha.regions = 0.0)+
+  mapview(jarnvagstation, col.regions = "white", color = "black", cex = 9, legend = FALSE)+
+  mapview(jarnvag, color = "black", lwd = 2, legend = FALSE)
+
+```
+

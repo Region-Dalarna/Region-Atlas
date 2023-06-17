@@ -9,7 +9,14 @@ output: html_document
 
 # libraries
 if (!require("pacman")) install.packages("pacman")
-pacman::p_load(tidyverse, sf, sp, httr, mapview, leaflet, readxl, keyring)
+pacman::p_load(tidyverse, 
+               sf, 
+               sp, 
+               httr, 
+               mapview, 
+               leaflet, 
+               readxl, 
+               keyring)
 
 source("G:/skript/func/func_GIS.R", encoding = "utf-8", echo = FALSE)
 source("G:/skript/func/func_postgis.R", encoding = "utf-8", echo = FALSE)

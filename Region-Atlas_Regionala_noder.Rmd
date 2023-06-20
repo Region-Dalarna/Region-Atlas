@@ -63,15 +63,15 @@ sysselsattning <- st_read(sysselsattning_fil, crs = 3006)
 #
 
 ```{r pressure, echo=FALSE}
-mapview(bredband, col.regions = c("green"), cex = 15, alpha = 0, label = "perc_hom_pass")+
-  mapview(kollektivtrafik, col.regions = c("blue"), cex = 12, alpha = 0)+
-  mapview(komersiell_service, col.regions = c("orangered1"), cex = 8, alpha = 0)+
-  mapview(sysselsattning, col.regions = c("cyan"), cex = 4, alpha = 0.1)+
+mapview(bredband, col.regions = c("green"), cex = 15, alpha = 0, label = "perc_hom_pass", homebutton = FALSE)+
+  mapview(kollektivtrafik, col.regions = c("blue"), cex = 12, alpha = 0, homebutton = FALSE)+
+  mapview(komersiell_service, col.regions = c("orangered1"), cex = 8, alpha = 0, homebutton = FALSE)+
+  mapview(sysselsattning, col.regions = c("cyan"), cex = 4, alpha = 0.1, homebutton = FALSE)+
   mapview(tatorter, lwd = 1, color = "khaki4", col.regions = "grey80", alpha.regions = 0.1, legend = FALSE, label = "TATORT", homebutton = FALSE)+
   mapview(smaorter, lwd = 1, color = "khaki3", col.regions = "grey100", alpha.regions = 0.1, legend = FALSE, label = "BEF", homebutton = FALSE)+
   mapview(fritidshusomr, lwd = 1, color = "green", alpha.regions = 0.1, legend = FALSE, homebutton = FALSE)+
   mapview(handelsomr, lwd = 1, color = "blue", alpha.regions = 0.1, legend = FALSE, homebutton = FALSE)+
   mapview(arbetsplatsomr, lwd = 1, color = "red", alpha.regions = 0.1, legend = FALSE, label = "ARBETSPLOM", homebutton = FALSE)+
-  mapview(kommuner, lwd = 1, color = "grey40", alpha.regions = 0, legend = FALSE, homebutton = FALSE)
+  mapview(kommuner, zcol = "KNNAMN", lwd = 1, color = "grey40", alpha.regions = 0, legend = FALSE, burst = TRUE)
 ```
 

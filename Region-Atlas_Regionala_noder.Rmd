@@ -1,21 +1,48 @@
 ---
-title: "Region-Atlas Regionala strategiska noder"
-author: "Samhällsanalys"
+title: "Region-Atlas, Regionala strategiska noder"
+author: ""
 date: "`r Sys.Date()`"
 output: html_document
 ---
+:::{#header}
+<img src="logo_liggande_platta_farg.png" height="50" width="100" margin="0 auto"/>
+:::
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = FALSE)
 ```
 
-## R Markdown
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+```{r regionala noder, include=FALSE, echo=FALSE}
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+# libraries
+if (!require("pacman")) install.packages("pacman")
+pacman::p_load(tidyverse, sf, sp, mapview, dplyr)
+               
+kommun_fil <- "G:/skript/henrik/GitHub/Region-Atlas/QGIS/Bara_Dalarnas_kommuner_SCB_07.shp"
 
-```{r regionala noder}
+kommuner <- st_read(kommun_fil, crs = 3006)
+
+tatort_fil <- "G:/skript/henrik/GitHub/Region-Atlas/QGIS/tatorter_dalarna.gpkg"
+
+tatorter <- st_read(tatort_fil, crs = 3006)
+
+smaort_fil <- "G:/skript/henrik/GitHub/Region-Atlas/QGIS/smaorter_dalarna.gpkg"
+
+smaorter <- st_read(smaort_fil, crs = 3006)
+
+fritidshusomr_fil <- "G:/skript/henrik/GitHub/Region-Atlas/QGIS/fritidshusomr_dalarna.gpkg"
+
+fritidshusomr <- st_read(fritidshusomr_fil, crs = 3006)
+
+arbetsplatsomr_fil <- "G:/skript/henrik/GitHub/Region-Atlas/QGIS/arbetsplatsomr_dalarna.gpkg"
+
+arbetsplatsomr <- st_read(arbetsplatsomr_fil, crs = 3006)
+glimpse(arbetsplatsomr)
+handelsomr_fil <- "G:/skript/henrik/GitHub/Region-Atlas/QGIS/handelsomr_dalarna.gpkg"
+
+handelsomr <- st_read(handelsomr_fil, crs = 3006)
+  
 bredband_fil <- "G:/skript/henrik/GitHub/Region-Atlas/QGIS/nod_bredband.gpkg"
 
 bredband <- st_read(bredband_fil, crs = 3006)
@@ -33,15 +60,18 @@ sysselsattning_fil <- "G:/skript/henrik/GitHub/Region-Atlas/QGIS/nod_sysselsattn
 sysselsattning <- st_read(sysselsattning_fil, crs = 3006)
 ```
 
-## Including Plots
-
-You can also embed plots, for example:
+#
 
 ```{r pressure, echo=FALSE}
 mapview(bredband, col.regions = c("green"), cex = 15, alpha = 0, label = "perc_hom_pass")+
   mapview(kollektivtrafik, col.regions = c("blue"), cex = 12, alpha = 0)+
   mapview(komersiell_service, col.regions = c("orangered1"), cex = 8, alpha = 0)+
-  mapview(sysselsattning, col.regions = c("cyan"), cex = 4, alpha = 0.1)
+  mapview(sysselsattning, col.regions = c("cyan"), cex = 4, alpha = 0.1)+
+  mapview(tatorter, lwd = 1, color = "khaki4", col.regions = "grey80", alpha.regions = 0.1, legend = FALSE, label = "TATORT", homebutton = FALSE)+
+  mapview(smaorter, lwd = 1, color = "khaki3", col.regions = "grey100", alpha.regions = 0.1, legend = FALSE, label = "BEF", homebutton = FALSE)+
+  mapview(fritidshusomr, lwd = 1, color = "green", alpha.regions = 0.1, legend = FALSE, homebutton = FALSE)+
+  mapview(handelsomr, lwd = 1, color = "blue", alpha.regions = 0.1, legend = FALSE, homebutton = FALSE)+
+  mapview(arbetsplatsomr, lwd = 1, color = "red", alpha.regions = 0.1, legend = FALSE, label = "ARBETSPLOM", homebutton = FALSE)+
+  mapview(kommuner, lwd = 1, color = "grey40", alpha.regions = 0, legend = FALSE, homebutton = FALSE)
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.

@@ -1,0 +1,205 @@
+---
+title: "Laddinfrastruktur i Dalarna"
+author: "Samhällsanalys, Region Dalarna"
+date: "2023-06-09"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+Följande är en visualisering av publika laddstationer i Dalarna. Innehållet kommer att byggas på efterhand som kunskap ökar och data förändras. Data laddas ner från Nobil via en API.
+<br>
+<details>
+  <summary>Mer information om API och definitioner</summary>
+<div title="Källa: Energimyndigheten"> En API är kortfattat en länk mellan två maskiner, vilket möjliggör automatiserad uppdatering av data direkt från källan.<https://www.energimyndigheten.se/klimat--miljo/transporter/energieffektiva-och-fossilfria-fordon-och-transporter/laddinfrastruktur/registrera-din-laddstation/utvecklare/></div>  
+Energimyndigheten definierar publik laddning som "en laddstation som står placerad där vem som helst kan ladda bilen, till exempel utmed landsvägar, i parkeringshus, vid köpcentrum, vid infartsparkeringar eller resecentrum." <https://www.energimyndigheten.se/klimat--miljo/transporter/energieffektiva-och-fossilfria-fordon-och-transporter/laddinfrastruktur/>.
+
+</details>
+<br>
+Anslutningspunkter och laddstationer är nyckelord; Laddstationer har olika mängd anslutningspunkter. Diagrammen nedan visar summan av anslutningspunkter och laddstationer per kommun. Malung-Sälen har flest anslutningspunkter och Smedjebacken har flest antal laddstationer.
+
+
+```{r, include=FALSE, echo=FALSE, message=FALSE, warning=FALSE}
+# library(httr)
+# library(jsonlite)
+# library(mapview)
+# library(tidyr)
+# library(tidyverse)
+# library(sf)
+# library(tmap)
+# library(dplyr)
+# library(leaflet)
+# library(ggpubr)
+
+if (!require("pacman")) install.packages("pacman")
+p_load(httr,
+       jsonlite,
+       mapview,
+       tidyverse,
+       tidyr,
+       sf,
+       tmap,
+       dplyr,
+       leaflet,
+       ggpubr)
+
+source("G:/skript/func/func_diagramfunktioner.R", encoding = "utf-8", echo = FALSE)
+source("G:/skript/func/func_text.R", encoding = "utf-8", echo = FALSE)
+
+mapp_scbadmgranser <- "G:/Samhällsanalys/GIS/Grundkartor/Adm gränser med kustgränser/"
+filnamn_kommuner <- "Kommungränser_SCB_07.shp"
+
+sokvag_kommuner_sv <- paste0(mapp_scbadmgranser, filnamn_kommuner)
+output_mapp = "G:/Skript/projekt/gis/laddstolpar/utdata/" 
+
+# ==========================================================================================================
+
+kommuner_sv <- st_read(sokvag_kommuner_sv)
+
+#####Här laddas punktlagret med laddstolpar
+
+laddst_sv <- GET("https://nobil.no/api/server/datadump.php?apikey=2b9e9c013e44cd573e8f4b2db6813ad1&countrycode=SWE&fromdate=2012-06-02&format=json&file=false")
+laddst_sv_resp <- fromJSON(content(laddst_sv, as = "text"), flatten = FALSE)
+laddst_sv_df <- laddst_sv_resp$chargerstations$csmd
+
+# ====================================aggregera anslutningspunkter till kommuner ==============================================
+
+laddstationer <- laddst_sv_df %>% #byter namn på variabler 
+  rename(
+    namn = name,
+    gata = Street,
+    gatnr = House_number,
+    postnr = Zipcode,
+    ort = City,
+    kom_kod = Municipality_ID,
+    kommun = Municipality,
+    lan_kod = County_ID,
+    lan = County,
+    lages_bskrvng = Description_of_location,
+    agare = Owned_by,
+    operator = Operator,
+    n_ladd_punkt = Available_charging_points,
+    kommentar = User_comment,
+    kontakt = Contact_info,
+    skapad = Created,
+    uppdaterad = Updated,
+    station_status = Station_status,
+  )
+
+# ================
+laddstationer_anslut <- laddstationer %>% 
+  select(id, namn, gata, gatnr, postnr, ort, kom_kod, lan,
+         lan_kod, kommun, lages_bskrvng, agare, operator,  n_ladd_punkt, kommentar, 
+         kontakt, skapad, uppdaterad, station_status) %>% 
+  filter(lan_kod == '20') %>% 
+  group_by(kom_kod, kommun) %>%
+  summarise(sum_anslut_kom = sum(n_ladd_punkt), # lägg till na
+            sum_station_kom = n())
+
+# lägg ihop kommunpolygonerna med laddstolpar per kommun-statistiken
+laddst_anslut_kom <- left_join(kommuner_sv, laddstationer_anslut, by = c("KNKOD" = "kom_kod")) %>% 
+  filter(Lanskod_tx == 20)
+
+# greens = colorRampPalette(c('darkgreen', 'green'))
+# 
+# mapview(laddst_anslut_kom, zcol = "sum_anslut_kom", col.regions = greens(laddst_anslut_kom$sum_anslut_kom), at = seq(0, 150, 50))
+
+#====================punktlagret med laddstationer===============================
+
+#ta bort parenteser
+
+laddstationer_punkt <- laddst_sv_df$Position <- gsub("[()]", "", as.character(laddst_sv_df$Position))
+
+laddstationer_punkt <- laddst_sv_df %>%  separate_wider_delim(Position, ",", names = c("lat", "lon")) #WGS84 Decimal (lat, lon) 
+
+laddstationer_punkt <- st_as_sf(laddstationer_punkt, coords = c("lon", "lat"), 
+                 crs = 4326, agr = "constant")
+                                              #gör om till SWEREF99TM?
+#mapview(laddstationer_punkt)
+
+laddstationer_punkt <- laddstationer_punkt %>% 
+  rename(
+    namn = name,
+    gata = Street,
+    gatnr = House_number,
+    postnr = Zipcode,
+    ort = City,
+    kom_kod = Municipality_ID,
+    kommun = Municipality,
+    lan_kod = County_ID,
+    lan = County,
+    lages_bskrvng = Description_of_location,
+    agare = Owned_by,
+    operator = Operator,
+    n_ladd_punkt = Available_charging_points,
+    kommentar = User_comment,
+    kontakt = Contact_info,
+    skapad = Created,
+    uppdaterad = Updated,
+    station_status = Station_status,
+  ) 
+
+laddstationer_punkt <- laddstationer_punkt %>% select(id, namn, gata, gatnr, postnr, ort, kom_kod, lan, lan_kod, 
+         kommun, lages_bskrvng, agare, operator, n_ladd_punkt, kommentar, 
+         kontakt, skapad, uppdaterad)
+
+# Filtrerar på Dalarna, länskod = 20
+laddstationer_punkt <- laddstationer_punkt %>% filter(lan_kod == '20')
+
+pal <-  mapviewPalette("mapviewSpectralColors")
+
+# mapview(laddstationer_punkt, zcol = "n_ladd_punkt", legend = FALSE, col.regions = pal(15))
+# 
+# mapview(laddst_anslut_kom, zcol = "sum_anslut_kom", col.regions = greens(laddst_anslut_kom$sum_anslut_kom), at = seq(0, 150, 50))+
+#   mapview(laddstationer_punkt, zcol = "n_ladd_punkt", legend = FALSE, col.regions = pal(15))
+
+#==========Klart================
+
+
+```
+
+
+```{r laddstolpar, echo=FALSE, message=FALSE, warning=FALSE}
+anslut_graph <- ggplot(laddstationer_anslut,
+                       aes(x = reorder(kommun, -sum_anslut_kom),
+                           y = sum_anslut_kom),
+                       palette = diagramfarger())+
+  geom_col()+
+  labs(
+    title = "Anslutningspunkter",
+    y = "Antal anslutningspunkter",
+    x = "")+
+  theme(axis.text.x = element_text(angle = 45, hjust = 0.95)
+  )
+station_graph <- ggplot(laddstationer_anslut,
+                        aes(x = reorder(kommun, -sum_station_kom),
+                            y = sum_station_kom),
+                        palette = diagramfarger())+
+  geom_col()+
+  labs(
+    title = "Laddstationer",
+    y = "Antal laddstationer",
+    x = "")+
+  theme(axis.text.x = element_text(angle = 45, hjust = 0.95)
+  )
+ggarrange(anslut_graph, station_graph, align ="h")
+
+```
+
+## Laddstationer och anslutningspunkter.
+Kartan är ett utkast på en interaktiv karta med lager som kan tändas och släckas med ikonen under zoom uppe till vänster i kartan. Det primära kartlagret är punkter på laddstationer(xy). De andra kartlagren är polygoner med antalet anslutningspunkter respektive laddstationer aggregerat till kommunnivå. Ett vänsterklick på ett objekt visar all tillgänglig information i den tabell som ligger till grund för aktuellt lager (ett vänsterklick utanför popupen i kartan stänger tabellen). När muspekaren vilar på ett objekt visas antal anslutningspunkter på aktuell laddstation eller summan av anslutningspunkter/laddstationer per kommun (beroende på vilket lager som är tänt).
+
+```{r laddst_sv_df, echo = FALSE, out.width='80%', message=FALSE, warning=FALSE}
+reds = colorRampPalette(c('pink', 'red'))
+orgs = colorRampPalette(c('yellow', 'red'))
+
+
+mapview(laddst_anslut_kom, zcol = "sum_anslut_kom", col.regions = reds(laddst_anslut_kom$sum_anslut_kom), at = seq(0, 150, 30), alpha.regions = 0.2, layer.name = c("Anslutningspunkter"))+
+  mapview(laddst_anslut_kom, zcol = "sum_station_kom", col.regions = orgs(laddst_anslut_kom$sum_station_kom), at = seq(0, 45, 15), alpha.regions = 0.2, layer.name = c("Laddstationer"))+
+  mapview(laddstationer_punkt, zcol = "n_ladd_punkt", legend = FALSE, col.regions = pal(15), layer.name = c("Laddstationer (xy)"))
+
+```
+
